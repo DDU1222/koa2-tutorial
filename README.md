@@ -39,17 +39,17 @@ log4js 中的日志输出可分为如下7个等级：
 
 ### 初始化
 
-log 中间件的核心内容
+首先
+
+* 引入 log4js 模块、path 模块、 用于记录客户端信息的 access 模块（将客户端信息拆分出去，方便以后拓展）；
+* 定义传入中间件参数的默认值，日志级别、文件夹名称、环境变量、项目名称、服务器IP；
 
 ```
    
 // 引入工具模块 
 const log4js = require('log4js');
 const path = require("path");
-const client = require("./access.js");
-
-// ALL OFF 这两个等级并不会直接在业务代码中使用
-const methods = ["trace", "debug", "info", "warn", "error", "fatal", "mark"];
+const access = require("./access.js");
 	
 // 定义传入参数的默认值
 const baseInfo = {
@@ -62,40 +62,26 @@ const baseInfo = {
 
 ```
 
-按照 log4js 2.x 文档中定义的日志文件名的生成规则
+将定义好的默认参数与传入到中间件的参数结合，解构后结合 [log4js 2.x 规则](https://nomiddlename.github.io/log4js-node/appenders.html)定义初始化参数。
 
 ```
-const appenders = {
-  task: {
-    type: 'dateFile',  // 日志类型
-    filename: `${dir}/task`, // 输出文件名
-    pattern: '-yyyy-MM-dd.log',  //后缀
-    alwaysIncludePattern: true  // 是否总是有后缀名
-  }
-};
-```
-
-*  type：'dataFile' -- 按照日期的格式分割日志
-*  filename -- 将自定义的输出目录与定义的文件名进行拼接
-*  pattern -- 按照日期的格式每天新建一个日志文件
-
-  
-判断若是开发环境，将日志同时打印到终端，方便开发者查看。
-
-
-```
-if (env === "dev" || env === "local" || env === "development"){
-   appenders.out = {
-     type: "console"
-   }
-}
-```
-
-定义log4js的初始化参数
-
-```
+const opts = Object.assign({}, baseInfo, options || {}) ;
+const {
+  projectName,
+  serverIp,
+  appLogLevel,
+  dir,
+  env
+} = opts;
 const config = {
-  appenders,
+  appenders: {
+    task: {
+      type: 'dateFile',  // 日志类型
+      filename: `${dir}/task`, // 输出文件名
+      pattern: '-yyyy-MM-dd.log',  //后缀
+      alwaysIncludePattern: true  // 是否总是有后缀名
+    }
+  },
   categories: {
     default: {
 	   appenders: Object.keys(appenders),
@@ -105,11 +91,26 @@ const config = {
 };
 ```
 
+*  type：'dataFile' -- 按照日期的格式分割日志
+*  filename -- 将自定义的输出目录与定义的文件名进行拼接
+*  pattern -- 按照日期的格式每天新建一个日志文件
+
+  
+判断环境变量 若为 `dev` 、`local`、 `development` 开发环境，将日志同时打印到终端，方便开发者查看。
+
+```
+if (env === "dev" || env === "local" || env === "development"){
+   config.appenders.out = {
+     type: "console"
+   }
+}
+```
 
 
 ### 打印『访问日志 』：
 
 在每次请求进入的时候记录开始时间，执行完毕记录下结束时间，从而记录访问的响应时间，与上下文中的客户端信息一并记录在访问日志中。
+返回一个异步函数，每次发送 http 请求时都会经过此函数，打印出info级别的日志，从而实现访问日志。
 
 ```
 // 访问日志
@@ -149,6 +150,8 @@ return async (ctx, next) => {
 
 初始化 logger 函数，并返回异步函数。调用 log 函数打印日志时，循环 logger 中的方法将高于自定义级别的方法挂载到上下文上，并将低于自定义级别的方法赋值空函数。此外，不挂载到上下文上，暴露 logger 方法并在需要使用的地方按照模块化引入也是一种不错的选择。
 
+
+
 ```
 
 // 应用日志
@@ -182,7 +185,7 @@ return async (ctx, next) => {
 
 ### 错误处理
 
-最后，调用 logger 主函数时再封装一层错误处理，将错误信息抛出，让全局监听的错误处理函数进行处理。
+最后， 引入 logger 主函数， 调用 logger 主函数时再封装一层错误处理，将错误信息抛出，让全局监听的错误处理函数进行处理。
 
 ```
 const convert = require("koa-convert");

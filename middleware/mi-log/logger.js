@@ -1,6 +1,6 @@
 const log4js = require('log4js');
 const path = require("path");
-const client = require("./access.js");
+const access = require("./access.js");
 
 // ALL OFF 这两个等级并不会直接在业务代码中使用
 const methods = ["trace", "debug", "info", "warn", "error", "fatal", "mark"];
@@ -76,7 +76,7 @@ module.exports = (options) => {
     methods.forEach((method, i) => {
       if (i >= currentLevel) {
         contextLogger[method] = (message) => {
-          performanceLogger[method](client(ctx, message, commonInfo))
+          performanceLogger[method](access(ctx, message, commonInfo))
         }
       } else {
         contextLogger[method] = () => {}
@@ -87,7 +87,7 @@ module.exports = (options) => {
     await next();
     // 记录URL以及页面执行时间
     const delta = Date.now() - start;
-    accessLogger.info(client(ctx, {
+    accessLogger.info(access(ctx, {
       responseTime: delta
     }, commonInfo))
   }
